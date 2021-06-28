@@ -27,18 +27,21 @@ def on_collision(agent1, agent2, contact):
   print('v_ego:', agent1.velocity)
 
 
-def initialize_simulator_and_dv(map):
+def initialize_simulator_and_dv(map, sim):
     SIMULATOR_HOST = os.environ.get("SIMULATOR_HOST", "127.0.0.1")
     SIMULATOR_PORT = int(os.environ.get("SIMULATOR_PORT", 8181))
     BRIDGE_HOST = os.environ.get("BRIDGE_HOST", "127.0.0.1")
     BRIDGE_PORT = int(os.environ.get("BRIDGE_PORT", 9090))
+    if not sim:
 
-    sim = lgsvl.Simulator(SIMULATOR_HOST, SIMULATOR_PORT)
-    if sim.current_scene == map:
-        sim.reset()
-    else:
-        # seed make sure the weather and NPC behvaiors deterministic
-        sim.load(map, seed=0)
+        sim = lgsvl.Simulator(SIMULATOR_HOST, SIMULATOR_PORT)
+        print('dir(sim)', dir(sim))
+        print('sim.current_scene', sim.current_scene)
+        if sim.current_scene == map:
+            sim.reset()
+        else:
+            # seed make sure the weather and NPC behvaiors deterministic
+            sim.load(map, seed=0)
 
 
     spawns = sim.get_spawn()
@@ -51,7 +54,7 @@ def initialize_simulator_and_dv(map):
     # 6.0(no telephoto camera and clock sensor): 4622f73a-250e-4633-9a3d-901ede6b9551
     # 6.0(no clock sensor): f68151d1-604c-438e-a1a5-aa96d5581f4b
     # 6.0(with signal sensor): 9272dd1a-793a-45b2-bff4-3a160b506d75
-    ego = sim.add_agent("9272dd1a-793a-45b2-bff4-3a160b506d75", lgsvl.AgentType.EGO, state)
+    ego = sim.add_agent("2e9095fa-c9b9-4f3f-8d7d-65fa2bb03921", lgsvl.AgentType.EGO, state)
     ego.connect_bridge(BRIDGE_HOST, BRIDGE_PORT)
     ego.on_collision(on_collision)
 
@@ -85,12 +88,10 @@ def initialize_simulator_and_dv(map):
 
 
 
-def run_svl_simulation(map, config):
-
-    atexit.register(kill_mainboard)
-    sim, ego, start, destination = initialize_simulator_and_dv(map)
+def run_svl_simulation(map, config, sim):
 
 
+    sim, ego, start, destination = initialize_simulator_and_dv(map, sim)
 
 
     middle_point = lgsvl.Transform(position=(destination.position + start.position) * 0.5, rotation=start.rotation)
@@ -129,12 +130,12 @@ def run_svl_simulation(map, config):
     print("Simulation frames =", sim.current_frame)
 
     # let simulator initialize and settle a bit before starting
-    sim.run(time_limit=2)
+    # sim.run(time_limit=2)
 
     t1 = time.time()
     s1 = sim.current_time
 
-    duration = 320
+    duration = 20
     step_time = 1
     step_rate = int(1.0 / step_time)
     steps = duration * step_rate
@@ -163,10 +164,14 @@ def run_svl_simulation(map, config):
         # time.sleep(0.2)
 
     t3 = time.time()
+    sim.reset()
+    return sim
 
 
 
 if __name__ == '__main__':
     map = "BorregasAve"
     config = [4, 4, 2, 3, 10, 50]
-    run_svl_simulation(map, config)
+    atexit.register(kill_mainboard)
+    sim = run_svl_simulation(map, config, None)
+    run_svl_simulation(map, config, sim)
