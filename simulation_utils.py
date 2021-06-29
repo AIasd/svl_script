@@ -16,7 +16,7 @@ from .object_types import static_types, pedestrian_types, vehicle_types
 from customized_utils import emptyobject
 import numpy as np
 
-
+accident_happen = False
 
 # temporary, can be imported from customized_utils
 def exit_handler():
@@ -59,13 +59,18 @@ def initialize_simulator(map, sim_specific_arguments):
 
 def initialize_dv_and_ego(sim, model_id, start, destination, BRIDGE_HOST, BRIDGE_PORT, events_path):
 
+    global accident_happen
+    accident_happen = False
+
     def on_collision(agent1, agent2, contact):
+        global accident_happen
+        accident_happen = True
         name1 = "STATIC OBSTACLE" if agent1 is None else agent1.name
         name2 = "STATIC OBSTACLE" if agent2 is None else agent2.name
         print("{} collided with {} at {}".format(name1, name2, contact))
         print('v_ego:', agent1.state.velocity)
 
-        loc = contact
+        loc = agent1.transform.position
         if not agent2:
             other_agent_type = 'static'
         else:
@@ -79,6 +84,7 @@ def initialize_dv_and_ego(sim, model_id, start, destination, BRIDGE_HOST, BRIDGE
         data_row = ['collision', ego_speed, other_agent_type, loc.x, loc.y]
         data_row = ','.join([str(data) for data in data_row])
         with open(events_path, 'a') as f_out:
+            print('\n'*3, 'data_row', data_row, '\n'*3)
             f_out.write(data_row+'\n')
 
 
@@ -123,6 +129,7 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
     events_path = os.path.join(arguments.deviations_folder, "events.txt")
     deviations_path = os.path.join(arguments.deviations_folder, 'deviations.txt')
     main_camera_folder = os.path.join(arguments.deviations_folder, 'main_camera_data')
+
     if not os.path.exists(main_camera_folder):
         os.mkdir(main_camera_folder)
 
@@ -180,24 +187,24 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
 
         other_agents.append(p)
 
-    # for vehicle in customized_data['vehicles_list']:
-    #     vehicle_position_offset = lgsvl.Vector(vehicle.x, 0, vehicle.y)
-    #     vehicle_rotation_offset = lgsvl.Vector(0, 0, 0)
-    #     vehicle_point = lgsvl.Transform(position=middle_point.position+vehicle_position_offset, rotation=middle_point.rotation+vehicle_rotation_offset)
-    #
-    #     forward = lgsvl.utils.transform_to_forward(vehicle_point)
-    #
-    #     wps = []
-    #     for wp in vehicle.waypoints:
-    #         loc = middle_point.position + lgsvl.Vector(wp.x, 0, wp.y)
-    #         wps.append(lgsvl.DriveWaypoint(loc, vehicle.speed, lgsvl.Vector(0, 0, 0), 0, False, wp.trigger_distance))
-    #
-    #     state = lgsvl.AgentState()
-    #     state.transform = vehicle_point
-    #     p = sim.add_agent(vehicle_types[vehicle.model], lgsvl.AgentType.NPC, state)
-    #     p.follow(wps, False)
-    #
-    #     other_agents.append(p)
+    for vehicle in customized_data['vehicles_list']:
+        vehicle_position_offset = lgsvl.Vector(vehicle.x, 0, vehicle.y)
+        vehicle_rotation_offset = lgsvl.Vector(0, 0, 0)
+        vehicle_point = lgsvl.Transform(position=middle_point.position+vehicle_position_offset, rotation=middle_point.rotation+vehicle_rotation_offset)
+
+        forward = lgsvl.utils.transform_to_forward(vehicle_point)
+
+        wps = []
+        for wp in vehicle.waypoints:
+            loc = middle_point.position + lgsvl.Vector(wp.x, 0, wp.y)
+            wps.append(lgsvl.DriveWaypoint(loc, vehicle.speed, lgsvl.Vector(0, 0, 0), 0, False, wp.trigger_distance))
+
+        state = lgsvl.AgentState()
+        state.transform = vehicle_point
+        p = sim.add_agent(vehicle_types[vehicle.model], lgsvl.AgentType.NPC, state)
+        p.follow(wps, False)
+
+        other_agents.append(p)
 
 
 
@@ -249,8 +256,10 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
 
         for sensor in ego.get_sensors():
             if sensor.name == "Main Camera":
-                print('\n save main camera!!!\n')
-                sensor.save(os.path.join(main_camera_folder, "main_camera_"+str(i)+".png"), compression=0)
+                rel_path = "../2020_CARLA_challenge/"+main_camera_folder+"/"+"main_camera_"+str(i)+".png"
+                sensor.save(rel_path, compression=9)
+        if accident_happen:
+            break
         time.sleep(0.2)
     sim.reset()
 

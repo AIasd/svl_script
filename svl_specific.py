@@ -6,7 +6,7 @@ from .object_params import Pedestrian, Vehicle, Static, Waypoint
 from customized_utils import make_hierarchical_dir, emptyobject, check_bug, classify_bug_type
 from .scene_configs import customized_bounds_and_distributions, customized_routes
 from .simulation_utils import start_simulation
-
+import shutil
 
 
 def convert_x_to_customized_data(
@@ -176,7 +176,7 @@ def estimate_objectives(save_path, default_objectives=np.array([0., 20., 1., 7.,
     else:
         route_completion = False
         with open(events_path, 'r') as f_in:
-            tokens = f_in.read().split(',')
+            tokens = f_in.read().split('\n')[0].split(',')
             _, ego_linear_speed, object_type, x, y = tokens
             ego_linear_speed, x, y = float(ego_linear_speed), float(x), float(y)
         if ego_linear_speed > 0.1:
@@ -241,8 +241,9 @@ def run_svl_simulation(x, fuzzing_content, fuzzing_arguments, sim_specific_argum
 
     route_info = sim_specific_arguments.route_info
     deviations_folder = os.path.join(parent_folder, "current_run_data")
-    if not os.path.exists(deviations_folder):
-        os.mkdir(deviations_folder)
+    if os.path.exists(deviations_folder):
+        shutil.rmtree(deviations_folder)
+    os.mkdir(deviations_folder)
 
     arguments = emptyobject(deviations_folder=deviations_folder, model_id=model_id, route_info=route_info)
 
