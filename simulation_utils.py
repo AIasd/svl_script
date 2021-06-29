@@ -1,7 +1,5 @@
 '''
-fix traffic light not changing issue when vehicles are created
 tune objectives
-fix saving main camera
 top down camera
 '''
 
