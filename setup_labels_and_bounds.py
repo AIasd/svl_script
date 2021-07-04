@@ -16,9 +16,9 @@ from customized_utils import emptyobject
 
 
 general_fields = [
-    ("num_of_static", "int", 0, 1),
-    ("num_of_pedestrians", "int", 1, 2),
-    ("num_of_vehicles", "int", 1, 2),
+    ("num_of_static", "int", 1, 1),
+    ("num_of_pedestrians", "int", 1, 1),
+    ("num_of_vehicles", "int", 1, 1),
 ]
 
 road_fields = [

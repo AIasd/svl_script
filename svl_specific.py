@@ -151,21 +151,21 @@ def estimate_objectives(save_path, default_objectives=np.array([0., 20., 1., 7.,
     is_wrong_lane = 0
     is_run_red_light = 0
     is_collision = 0
-
-    with open(deviations_path, "r") as f_in:
-        for line in f_in:
-            type, d = line.split(",")
-            d = float(d)
-            if type == "min_d":
-                min_d = np.min([min_d, d])
-            elif type == "offroad_d":
-                offroad_d = np.min([offroad_d, d])
-            elif type == "wronglane_d":
-                wronglane_d = np.min([wronglane_d, d])
-            elif type == "dev_dist":
-                dev_dist = np.max([dev_dist, d])
-            elif type == "d_angle_norm":
-                d_angle_norm = np.min([d_angle_norm, d])
+    if os.path.exists(deviations_path):
+        with open(deviations_path, "r") as f_in:
+            for line in f_in:
+                type, d = line.split(",")
+                d = float(d)
+                if type == "min_d":
+                    min_d = np.min([min_d, d])
+                elif type == "offroad_d":
+                    offroad_d = np.min([offroad_d, d])
+                elif type == "wronglane_d":
+                    wronglane_d = np.min([wronglane_d, d])
+                elif type == "dev_dist":
+                    dev_dist = np.max([dev_dist, d])
+                elif type == "d_angle_norm":
+                    d_angle_norm = np.min([d_angle_norm, d])
 
     x = None
     y = None
@@ -217,14 +217,12 @@ def run_svl_simulation(x, fuzzing_content, fuzzing_arguments, sim_specific_argum
     port
 
     '''
-    print('before convert_x_to_customized_data')
     customized_data = convert_x_to_customized_data(x, fuzzing_content, port)
     parent_folder = fuzzing_arguments.parent_folder
     episode_max_time = fuzzing_arguments.episode_max_time
     mean_objectives_across_generations_path = fuzzing_arguments.mean_objectives_across_generations_path
     ego_car_model = fuzzing_arguments.ego_car_model
 
-    print('after convert_x_to_customized_data')
 
     # 5.0: 47b529db-0593-4908-b3e7-4b24a32a0f70
     # 6.0: c354b519-ccf0-4c1c-b3cc-645ed5751bb5
@@ -245,7 +243,7 @@ def run_svl_simulation(x, fuzzing_content, fuzzing_arguments, sim_specific_argum
         shutil.rmtree(deviations_folder)
     os.mkdir(deviations_folder)
 
-    arguments = emptyobject(deviations_folder=deviations_folder, model_id=model_id, route_info=route_info)
+    arguments = emptyobject(deviations_folder=deviations_folder, model_id=model_id, route_info=route_info, record_every_n_step=fuzzing_arguments.record_every_n_step)
 
 
 

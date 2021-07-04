@@ -1,4 +1,6 @@
 '''
+rerun code
+save in parallel (run a separate thread to record environment values, cyber-recorder, cyber-RT python API: https://github.com/ApolloAuto/apollo/blob/master/docs/cyber/CyberRT_Python_API.md, camera proto https://github.com/ApolloAuto/apollo/blob/master/modules/drivers/camera/proto/config.proto)
 tune objectives
 top down camera
 '''
@@ -82,50 +84,74 @@ def initialize_dv_and_ego(sim, model_id, start, destination, BRIDGE_HOST, BRIDGE
         data_row = ['collision', ego_speed, other_agent_type, loc.x, loc.y]
         data_row = ','.join([str(data) for data in data_row])
         with open(events_path, 'a') as f_out:
-            print('\n'*3, 'data_row', data_row, '\n'*3)
             f_out.write(data_row+'\n')
 
 
-    state = lgsvl.AgentState()
-    state.transform = start
+    times = 0
+    success = False
+    while times < 3:
+        try:
+            state = lgsvl.AgentState()
+            state.transform = start
 
-    ego = sim.add_agent(model_id, lgsvl.AgentType.EGO, state)
-    ego.connect_bridge(BRIDGE_HOST, BRIDGE_PORT)
-    ego.on_collision(on_collision)
+            ego = sim.add_agent(model_id, lgsvl.AgentType.EGO, state)
+            ego.connect_bridge(BRIDGE_HOST, BRIDGE_PORT)
+            ego.on_collision(on_collision)
 
-    # Dreamview setup
-    dv = lgsvl.dreamview.Connection(sim, ego, BRIDGE_HOST)
-    dv.set_hd_map('Borregas Ave')
-    dv.set_vehicle('Lincoln2017MKZ_LGSVL')
-    modules = [
-        'Localization',
-        'Perception',
-        'Transform',
-        'Routing',
-        'Prediction',
-        'Planning',
-        'Camera',
-        # 'Traffic Light',
-        'Control'
-    ]
+            # Dreamview setup
+            dv = lgsvl.dreamview.Connection(sim, ego, BRIDGE_HOST)
+            dv.set_hd_map('Borregas Ave')
+            dv.set_vehicle('Lincoln2017MKZ_LGSVL')
+            modules = [
+                'Localization',
+                'Perception',
+                'Transform',
+                'Routing',
+                'Prediction',
+                'Planning',
+                'Camera',
+                # 'Traffic Light',
+                'Control'
+            ]
 
-    start = lgsvl.Transform(position=ego.transform.position, rotation=ego.transform.rotation)
+            start = lgsvl.Transform(position=ego.transform.position, rotation=ego.transform.rotation)
 
-    print('start', start)
-    print('destination', destination)
-    dv.setup_apollo(destination.position.x, destination.position.z, modules, default_timeout=60)
-    print('finish setup_apollo')
+            print('start', start)
+            print('destination', destination)
+            dv.setup_apollo(destination.position.x, destination.position.z, modules, default_timeout=180)
+            print('finish setup_apollo')
+            success = True
+            break
+        except:
+            print('fail to spin up apollo, try again!')
+            times += 1
+    if not success:
+        raise Exception('fail to spin up apollo')
 
     return ego
 
 
 
+def save_camera(ego, main_camera_folder, i):
+    for sensor in ego.get_sensors():
+        if sensor.name == "Main Camera":
+            rel_path = "../2020_CARLA_challenge/"+main_camera_folder+"/"+"main_camera_"+str(i)+".png"
+            sensor.save(rel_path, compression=9)
+
+def save_measurement(ego, measurements_path):
+    state = ego.state
+    pos = state.position
+    rot = state.rotation
+    speed = state.speed * 3.6
+    with open(measurements_path, 'a') as f_out:
+        f_out.write(','.join([str(v) for v in [speed, pos.x, pos.z, rot.x, rot.y, rot.z]])+'\n')
 
 def start_simulation(customized_data, arguments, sim_specific_arguments, launch_server, episode_max_time):
 
 
     events_path = os.path.join(arguments.deviations_folder, "events.txt")
     deviations_path = os.path.join(arguments.deviations_folder, 'deviations.txt')
+    measurements_path = os.path.join(arguments.deviations_folder, 'measurements.txt')
     main_camera_folder = os.path.join(arguments.deviations_folder, 'main_camera_data')
 
     if not os.path.exists(main_camera_folder):
@@ -204,62 +230,47 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
 
         other_agents.append(p)
 
+    # WIP: continuously run the simulation
+    duration = episode_max_time
+    continuous = False
+    if continuous == True:
+        # save_camera(ego, main_camera_folder, i)
+        # save_measurement(ego, measurements_path)
+        # gather_info(ego, other_agents, cur_values, deviations_path)
+        from multiprocessing import Process
+        p = Process(target=save_measurement, args=(ego, measurements_path, ))
+        p.daemon = True
+        p.start()
+        sim.run(time_limit=duration, time_scale=2)
+        p.terminate()
+
+    else:
+        step_time = 1
+        step_rate = 1.0 / step_time
+        steps = int(duration * step_rate)
 
 
-    t0 = time.time()
-    s0 = sim.current_time
-    print()
-    print("Total real time elapsed = {:5.3f}".format(0))
-    print("Simulation time = {:5.1f}".format(s0))
-    print("Simulation frames =", sim.current_frame)
-
-    # let simulator initialize and settle a bit before starting
-    # sim.run(time_limit=2)
-
-    t1 = time.time()
-    s1 = sim.current_time
-
-    duration = 30 #episode_max_time
-    step_time = 1
-    step_rate = int(1.0 / step_time)
-    steps = duration * step_rate
+        cur_values = emptyobject(min_d=10000, d_angle_norm=1)
 
 
-    cur_values = emptyobject(min_d=10000, d_angle_norm=1)
+        for i in range(steps):
+            sim.run(time_limit=step_time, time_scale=2)
 
+            if i % arguments.record_every_n_step == 0:
+                save_camera(ego, main_camera_folder, i)
+                save_measurement(ego, measurements_path)
 
-    for i in range(steps):
+                gather_info(ego, other_agents, cur_values, deviations_path)
 
-        sim.run(time_limit=step_time, time_scale=1)
-        t2 = time.time()
-        s2 = sim.current_time
+                d_to_dest = norm_2d(ego.transform.position, destination.position)
+                # print('d_to_dest', d_to_dest)
+                if d_to_dest < 5:
+                    print('ego car reachs destination successfully')
+                    break
 
-        state = ego.state
-        pos = state.position
-        rot = state.rotation
-        speed = state.speed * 3.6
+            if accident_happen:
+                break
 
-
-        print("Sim time = {:5.2f}".format(s2 - s1) + "; Real time elapsed = {:5.3f}; ".format(t2 - t1), end='')
-        print("Speed = {:4.1f}; Position = {:5.3f},{:5.3f},{:5.3f}; Rotation = {:5.3f},{:5.3f},{:5.3f}".format(speed, pos.x, pos.y, pos.z, rot.x, rot.y, rot.z))
-
-
-        gather_info(ego, other_agents, cur_values, deviations_path)
-
-        d_to_dest = norm_2d(ego.transform.position, destination.position)
-        print('d_to_dest', d_to_dest)
-        if d_to_dest < 5:
-            print('ego car reachs destination successfully')
-            break
-
-        for sensor in ego.get_sensors():
-            if sensor.name == "Main Camera":
-                rel_path = "../2020_CARLA_challenge/"+main_camera_folder+"/"+"main_camera_"+str(i)+".png"
-                sensor.save(rel_path, compression=9)
-        if accident_happen:
-            break
-        time.sleep(0.2)
-    sim.reset()
 
 
 # def angle_from_center_view_fov(target, ego, fov=90):
@@ -322,11 +333,12 @@ def get_bbox(agent):
     return bbox
 
 def gather_info(ego, other_agents, cur_values, deviations_path):
-    print('gather_info', 'deviations_path', deviations_path)
+    # print('gather_info', 'deviations_path', deviations_path)
     ego_bbox = get_bbox(ego)
     # TBD: only using the front two vertices
     # ego_front_bbox = ego_bbox[:2]
 
+    # hack: smaller than default values to make sure the files are created to have at least one line
     min_d = 9999
     d_angle_norm = 0.99
     for i, other_agent in enumerate(other_agents):
@@ -334,6 +346,7 @@ def gather_info(ego, other_agents, cur_values, deviations_path):
         # d_angle_norm_i = angle_from_center_view_fov(other_agent, ego, fov=90)
         # d_angle_norm = np.min([d_angle_norm, d_angle_norm_i])
         # if d_angle_norm_i == 0:
+        # TBD: temporarily disable d_angle_norm since Apollo uses LiDAR
         d_angle_norm = 0
         other_bbox = get_bbox(other_agent)
         for other_b in other_bbox:
@@ -342,8 +355,8 @@ def gather_info(ego, other_agents, cur_values, deviations_path):
                 d = norm_2d(other_b, ego_b)
                 min_d = np.min([min_d, d])
 
-    print('min_d', min_d)
-    print('d_angle_norm', d_angle_norm)
+    # print('min_d', min_d)
+    # print('d_angle_norm', d_angle_norm)
     if min_d < cur_values.min_d:
         cur_values.min_d = min_d
         with open(deviations_path, 'a') as f_out:

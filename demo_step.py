@@ -51,7 +51,7 @@ def initialize_simulator_and_dv(map):
     # 6.0(no telephoto camera and clock sensor): 4622f73a-250e-4633-9a3d-901ede6b9551
     # 6.0(no clock sensor): f68151d1-604c-438e-a1a5-aa96d5581f4b
     # 6.0(with signal sensor): 9272dd1a-793a-45b2-bff4-3a160b506d75
-    ego = sim.add_agent("9272dd1a-793a-45b2-bff4-3a160b506d75", lgsvl.AgentType.EGO, state)
+    ego = sim.add_agent("47b529db-0593-4908-b3e7-4b24a32a0f70", lgsvl.AgentType.EGO, state)
     ego.connect_bridge(BRIDGE_HOST, BRIDGE_PORT)
     ego.on_collision(on_collision)
 
