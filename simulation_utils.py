@@ -1,4 +1,6 @@
 '''
+fix modular mode traffic light (by manually control its cycle?)
+figure out determinism on different runs and different step_time (for both modular and non-modular)
 rerun code
 save in parallel (run a separate thread to record environment values, cyber-recorder, cyber-RT python API: https://github.com/ApolloAuto/apollo/blob/master/docs/cyber/CyberRT_Python_API.md, camera proto https://github.com/ApolloAuto/apollo/blob/master/modules/drivers/camera/proto/config.proto)
 tune objectives
@@ -104,12 +106,12 @@ def initialize_dv_and_ego(sim, model_id, start, destination, BRIDGE_HOST, BRIDGE
             dv.set_vehicle('Lincoln2017MKZ_LGSVL')
             modules = [
                 'Localization',
-                'Perception',
+                # 'Perception',
                 'Transform',
                 'Routing',
                 'Prediction',
                 'Planning',
-                'Camera',
+                # 'Camera',
                 # 'Traffic Light',
                 'Control'
             ]
@@ -241,7 +243,7 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
         p = Process(target=save_measurement, args=(ego, measurements_path, ))
         p.daemon = True
         p.start()
-        sim.run(time_limit=duration, time_scale=2)
+        sim.run(time_limit=duration, time_scale=1)
         p.terminate()
 
     else:

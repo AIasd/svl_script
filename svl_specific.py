@@ -217,6 +217,7 @@ def run_svl_simulation(x, fuzzing_content, fuzzing_arguments, sim_specific_argum
     port
 
     '''
+    print('\n'*3, 'x:\n', x, '\n'*3)
     customized_data = convert_x_to_customized_data(x, fuzzing_content, port)
     parent_folder = fuzzing_arguments.parent_folder
     episode_max_time = fuzzing_arguments.episode_max_time

@@ -27,7 +27,7 @@ def on_collision(agent1, agent2, contact):
   print('v_ego:', agent1.velocity)
 
 
-def initialize_simulator_and_dv(map):
+def initialize_simulator_and_dv(map, vehicle):
     SIMULATOR_HOST = os.environ.get("SIMULATOR_HOST", "127.0.0.1")
     SIMULATOR_PORT = int(os.environ.get("SIMULATOR_PORT", 8181))
     BRIDGE_HOST = os.environ.get("BRIDGE_HOST", "127.0.0.1")
@@ -57,8 +57,9 @@ def initialize_simulator_and_dv(map):
 
     # Dreamview setup
     dv = lgsvl.dreamview.Connection(sim, ego, BRIDGE_HOST)
-    dv.set_hd_map('Borregas Ave')
-    dv.set_vehicle('Lincoln2017MKZ_LGSVL')
+
+    dv.set_hd_map(map)
+    dv.set_vehicle(vehicle)
     modules = [
         'Localization',
         'Perception',
@@ -67,15 +68,18 @@ def initialize_simulator_and_dv(map):
         'Prediction',
         'Planning',
         'Camera',
-        # 'Traffic Light',
+        'Traffic Light',
         'Control'
     ]
 
-    start = lgsvl.Transform(position=ego.state.transform.position, rotation=ego.state.transform.rotation)
-    print('start', start)
-    # destination = spawns[0].destinations[0]
-    destination = lgsvl.Transform(position=lgsvl.Vector(24.970,-2.615,-29.956), rotation=lgsvl.Vector(0.731,104.547,358.660))
 
+    start = lgsvl.Transform(position=ego.state.transform.position, rotation=ego.state.transform.rotation)
+    # SanFrancisco
+    destination = spawns[0].destinations[0]
+    # Borregas
+    # destination = lgsvl.Transform(position=lgsvl.Vector(24.970,-2.615,-29.956), rotation=lgsvl.Vector(0.731,104.547,358.660))
+
+    print('start', start)
     print('destination', destination)
     dv.setup_apollo(destination.position.x, destination.position.z, modules, default_timeout=60)
     print('finish setup_apollo')
@@ -85,10 +89,10 @@ def initialize_simulator_and_dv(map):
 
 
 
-def run_svl_simulation(map, config):
+def run_svl_simulation(map, vehicle, config):
 
     atexit.register(kill_mainboard)
-    sim, ego, start, destination = initialize_simulator_and_dv(map)
+    sim, ego, start, destination = initialize_simulator_and_dv(map, vehicle)
 
 
 
@@ -136,8 +140,8 @@ def run_svl_simulation(map, config):
 
     duration = 320
     step_time = 1
-    step_rate = int(1.0 / step_time)
-    steps = duration * step_rate
+    step_rate = 1.0 / step_time
+    steps = int(duration * step_rate)
 
     t0 = time.time()
     for i in range(steps):
@@ -167,6 +171,9 @@ def run_svl_simulation(map, config):
 
 
 if __name__ == '__main__':
+    # "BorregasAve", "SanFrancisco"
     map = "BorregasAve"
+    # 'Lincoln2017MKZ' for 5.0, 'Lincoln2017MKZ_LGSVL' for 6.0
+    vehicle = 'Lincoln2017MKZ_LGSVL'
     config = [4, 4, 2, 3, 10, 50]
-    run_svl_simulation(map, config)
+    run_svl_simulation(map, vehicle, config)
