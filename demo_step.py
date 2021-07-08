@@ -51,7 +51,7 @@ def initialize_simulator_and_dv(map, vehicle):
     # 6.0(no telephoto camera and clock sensor): 4622f73a-250e-4633-9a3d-901ede6b9551
     # 6.0(no clock sensor): f68151d1-604c-438e-a1a5-aa96d5581f4b
     # 6.0(with signal sensor): 9272dd1a-793a-45b2-bff4-3a160b506d75
-    ego = sim.add_agent("47b529db-0593-4908-b3e7-4b24a32a0f70", lgsvl.AgentType.EGO, state)
+    ego = sim.add_agent("2e9095fa-c9b9-4f3f-8d7d-65fa2bb03921", lgsvl.AgentType.EGO, state)
     ego.connect_bridge(BRIDGE_HOST, BRIDGE_PORT)
     ego.on_collision(on_collision)
 
@@ -94,6 +94,15 @@ def run_svl_simulation(map, vehicle, config):
     atexit.register(kill_mainboard)
     sim, ego, start, destination = initialize_simulator_and_dv(map, vehicle)
 
+    controllables = sim.get_controllables()
+    for i in range(len(controllables)):
+        signal = controllables[i]
+        print("Index", i)
+        print("Type:", signal.type)
+        print("Transform:", signal.transform)
+        print("Current state:", signal.current_state)
+        print("Valid actions:", signal.valid_actions)
+
 
 
 
@@ -133,7 +142,7 @@ def run_svl_simulation(map, vehicle, config):
     print("Simulation frames =", sim.current_frame)
 
     # let simulator initialize and settle a bit before starting
-    sim.run(time_limit=2)
+    # sim.run(time_limit=2)
 
     t1 = time.time()
     s1 = sim.current_time

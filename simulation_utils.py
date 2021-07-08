@@ -165,6 +165,9 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
 
     sim, BRIDGE_HOST, BRIDGE_PORT = initialize_simulator(map, sim_specific_arguments)
 
+
+
+
     try:
         sim.weather = lgsvl.WeatherState(rain=customized_data['rain'], fog=customized_data['fog'], wetness=customized_data['wetness'], cloudiness=customized_data['cloudiness'], damage=customized_data['damage'])
         sim.set_time_of_day(customized_data['hour'], fixed=True)
@@ -232,6 +235,25 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
 
         other_agents.append(p)
 
+
+    # reset signals to their current policy (not sure why this is necessary)
+    controllables = sim.get_controllables()
+    for i in range(len(controllables)):
+        signal = controllables[i]
+        # print("Index", i)
+        # print("Type:", signal.type)
+        # print("Transform:", signal.transform)
+        # print("Current state:", signal.current_state)
+        # print("Valid actions:", signal.valid_actions)
+        # print("Default control policy:", signal.default_control_policy)
+        # print("Current control policy:", signal.control_policy)
+        if signal.type == "signal":
+            # control_policy = "trigger=200;green=5;yellow=1.5;red=5;loop"
+            control_policy = signal.control_policy
+            signal.control(control_policy)
+
+
+
     # WIP: continuously run the simulation
     duration = episode_max_time
     continuous = False
@@ -247,7 +269,7 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
         p.terminate()
 
     else:
-        step_time = 1
+        step_time = 0.1
         step_rate = 1.0 / step_time
         steps = int(duration * step_rate)
 
@@ -260,15 +282,15 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
 
             if i % arguments.record_every_n_step == 0:
                 save_camera(ego, main_camera_folder, i)
-                save_measurement(ego, measurements_path)
 
-                gather_info(ego, other_agents, cur_values, deviations_path)
+            save_measurement(ego, measurements_path)
+            gather_info(ego, other_agents, cur_values, deviations_path)
 
-                d_to_dest = norm_2d(ego.transform.position, destination.position)
-                # print('d_to_dest', d_to_dest)
-                if d_to_dest < 5:
-                    print('ego car reachs destination successfully')
-                    break
+            d_to_dest = norm_2d(ego.transform.position, destination.position)
+            # print('d_to_dest', d_to_dest)
+            if d_to_dest < 5:
+                print('ego car reachs destination successfully')
+                break
 
             if accident_happen:
                 break
@@ -357,8 +379,8 @@ def gather_info(ego, other_agents, cur_values, deviations_path):
                 d = norm_2d(other_b, ego_b)
                 min_d = np.min([min_d, d])
 
-    # print('min_d', min_d)
-    # print('d_angle_norm', d_angle_norm)
+    print('min_d', min_d)
+    print('d_angle_norm', d_angle_norm)
     if min_d < cur_values.min_d:
         cur_values.min_d = min_d
         with open(deviations_path, 'a') as f_out:
