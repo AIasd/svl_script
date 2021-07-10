@@ -269,7 +269,7 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
         p.terminate()
 
     else:
-        step_time = 0.1
+        step_time = 0.25
         step_rate = 1.0 / step_time
         steps = int(duration * step_rate)
 
@@ -278,7 +278,7 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
 
 
         for i in range(steps):
-            sim.run(time_limit=step_time, time_scale=2)
+            sim.run(time_limit=step_time, time_scale=1)
 
             if i % arguments.record_every_n_step == 0:
                 save_camera(ego, main_camera_folder, i)

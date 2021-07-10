@@ -1,13 +1,15 @@
 import os
 import pickle
-import numpy as np
-import lgsvl
-from object_params import Pedestrian, Vehicle, Static, Waypoint
-from customized_utils import make_hierarchical_dir, emptyobject, check_bug, classify_bug_type
-from scene_configs import customized_bounds_and_distributions, customized_routes
-from simulation_utils import start_simulation
 import shutil
+from distutils.dir_util import copy_tree
+import numpy as np
 
+from customized_utils import make_hierarchical_dir, emptyobject, check_bug, classify_bug_type
+
+import lgsvl
+from svl_script.object_params import Pedestrian, Vehicle, Static, Waypoint
+from svl_script.simulation_utils import start_simulation
+from svl_script.scene_configs import customized_bounds_and_distributions, customized_routes
 
 def convert_x_to_customized_data(
     x,
@@ -305,7 +307,7 @@ def run_svl_simulation(x, fuzzing_content, fuzzing_arguments, sim_specific_argum
         # 'all_final_generated_transforms': all_final_generated_transforms,
     }
 
-    from distutils.dir_util import copy_tree
+
     copy_tree(deviations_folder, cur_folder)
 
     with open(cur_folder+'/'+'cur_info.pickle', 'wb') as f_out:
