@@ -14,7 +14,7 @@ import time
 import psutil
 import atexit
 import math
-from object_types import static_types, pedestrian_types, vehicle_types
+from svl_script.object_types import static_types, pedestrian_types, vehicle_types
 from customized_utils import emptyobject
 import numpy as np
 
