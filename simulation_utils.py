@@ -14,7 +14,7 @@ import time
 import psutil
 import atexit
 import math
-from .object_types import static_types, pedestrian_types, vehicle_types
+from object_types import static_types, pedestrian_types, vehicle_types
 from customized_utils import emptyobject
 import numpy as np
 
@@ -106,13 +106,13 @@ def initialize_dv_and_ego(sim, model_id, start, destination, BRIDGE_HOST, BRIDGE
             dv.set_vehicle('Lincoln2017MKZ_LGSVL')
             modules = [
                 'Localization',
-                # 'Perception',
+                'Perception',
                 'Transform',
                 'Routing',
                 'Prediction',
                 'Planning',
-                # 'Camera',
-                # 'Traffic Light',
+                'Camera',
+                'Traffic Light',
                 'Control'
             ]
 
@@ -379,8 +379,8 @@ def gather_info(ego, other_agents, cur_values, deviations_path):
                 d = norm_2d(other_b, ego_b)
                 min_d = np.min([min_d, d])
 
-    print('min_d', min_d)
-    print('d_angle_norm', d_angle_norm)
+    # print('min_d', min_d)
+    # print('d_angle_norm', d_angle_norm)
     if min_d < cur_values.min_d:
         cur_values.min_d = min_d
         with open(deviations_path, 'a') as f_out:

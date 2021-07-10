@@ -2,10 +2,10 @@ import os
 import pickle
 import numpy as np
 import lgsvl
-from .object_params import Pedestrian, Vehicle, Static, Waypoint
+from object_params import Pedestrian, Vehicle, Static, Waypoint
 from customized_utils import make_hierarchical_dir, emptyobject, check_bug, classify_bug_type
-from .scene_configs import customized_bounds_and_distributions, customized_routes
-from .simulation_utils import start_simulation
+from scene_configs import customized_bounds_and_distributions, customized_routes
+from simulation_utils import start_simulation
 import shutil
 
 
@@ -296,6 +296,7 @@ def run_svl_simulation(x, fuzzing_content, fuzzing_arguments, sim_specific_argum
         'fuzzing_arguments': fuzzing_arguments,
         'sim_specific_arguments': sim_specific_arguments_copy,
         'dt_arguments': dt_arguments,
+        'counter': counter,
 
         # helpful info
         'route_completion': route_completion,
