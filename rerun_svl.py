@@ -29,29 +29,40 @@ parent_folder = os.path.join(parent_folder, 'bugs')
 now = datetime.now()
 dt_time_str = now.strftime("%Y_%m_%d_%H_%M_%S")
 
+sim = None
 for subfolder in os.listdir(parent_folder):
     cur_folder = os.path.join(parent_folder, subfolder)
     pickle_path = os.path.join(cur_folder, 'cur_info.pickle')
     print('pickle_path', pickle_path)
-    with open(pickle_path, 'rb') as f_in:
-        d = pickle.load(f_in)
+    if os.path.exists(pickle_path):
+        with open(pickle_path, 'rb') as f_in:
+            d = pickle.load(f_in)
 
-        x, fuzzing_content, fuzzing_arguments, sim_specific_arguments, dt_arguments = d['x'], d['fuzzing_content'], d['fuzzing_arguments'], d['sim_specific_arguments'], d['dt_arguments']
+            x = d['x']
+            fuzzing_content = d['fuzzing_content']
+            fuzzing_arguments = d['fuzzing_arguments']
+            sim_specific_arguments = d['sim_specific_arguments']
+            dt_arguments = d['dt_arguments']
+
+            sim_specific_arguments.sim = sim
 
 
-        launch_server = True
-        if 'counter' in d:
-            counter = d['counter']
-        else:
-            counter = int(subfolder)
-        port = 2003
 
-        fuzzing_arguments.root_folder = 'rerun_svl'
-        fuzzing_arguments.parent_folder = make_hierarchical_dir([fuzzing_arguments.root_folder, fuzzing_arguments.algorithm_name, fuzzing_arguments.route_type, fuzzing_arguments.scenario_type, fuzzing_arguments.ego_car_model, dt_time_str])
-        fuzzing_arguments.mean_objectives_across_generations_path = os.path.join(parent_folder, 'mean_objectives_across_generations.txt')
+            if 'counter' in d:
+                counter = d['counter']
+            else:
+                counter = int(subfolder)
+            launch_server = True
+            port = 2003
 
-        objectives, run_info = run_svl_simulation(x, fuzzing_content, fuzzing_arguments, sim_specific_arguments, dt_arguments, launch_server, counter, port)
+            fuzzing_arguments.root_folder = 'rerun_svl'
+            fuzzing_arguments.parent_folder = make_hierarchical_dir([fuzzing_arguments.root_folder, fuzzing_arguments.algorithm_name, fuzzing_arguments.route_type, fuzzing_arguments.scenario_type, fuzzing_arguments.ego_car_model, dt_time_str])
+            fuzzing_arguments.mean_objectives_across_generations_path = os.path.join(parent_folder, 'mean_objectives_across_generations.txt')
 
-        print('\n'*3)
-        print("run_info['is_bug'], run_info['bug_type'], objectives", run_info['is_bug'], run_info['bug_type'], objectives)
-        print('\n'*3)
+            objectives, run_info = run_svl_simulation(x, fuzzing_content, fuzzing_arguments, sim_specific_arguments, dt_arguments, launch_server, counter, port)
+
+            sim = sim_specific_arguments.sim
+
+            print('\n'*3)
+            print("run_info['is_bug'], run_info['bug_type'], objectives", run_info['is_bug'], run_info['bug_type'], objectives)
+            print('\n'*3)
