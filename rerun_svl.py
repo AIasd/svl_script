@@ -23,7 +23,7 @@ from datetime import datetime
 from customized_utils import make_hierarchical_dir
 from svl_specific import run_svl_simulation
 
-parent_folder = 'run_results_svl/nsga2-un/BorregasAve_forward/default/apollo_6_with_signal/0.1_400_0.2_0.5' #'run_results_svl/nsga2-un/BorregasAve_forward/default/apollo_6_with_signal/1_700_0.1_0.5'
+parent_folder = 'run_results_svl/nsga2-un/BorregasAve_forward/default/apollo_6_with_signal/0.25_500_0.1_0.5'
 parent_folder = os.path.join(parent_folder, 'bugs')
 
 now = datetime.now()
@@ -45,8 +45,6 @@ for subfolder in os.listdir(parent_folder):
             dt_arguments = d['dt_arguments']
 
             sim_specific_arguments.sim = sim
-
-
 
             if 'counter' in d:
                 counter = d['counter']

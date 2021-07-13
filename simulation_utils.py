@@ -104,17 +104,33 @@ def initialize_dv_and_ego(sim, model_id, start, destination, BRIDGE_HOST, BRIDGE
             dv = lgsvl.dreamview.Connection(sim, ego, BRIDGE_HOST)
             dv.set_hd_map('Borregas Ave')
             dv.set_vehicle('Lincoln2017MKZ_LGSVL')
-            modules = [
-                'Localization',
-                'Perception',
-                'Transform',
-                'Routing',
-                'Prediction',
-                'Planning',
-                'Camera',
-                'Traffic Light',
-                'Control'
-            ]
+
+            if model_id == '9272dd1a-793a-45b2-bff4-3a160b506d75':
+                modules = [
+                    'Localization',
+                    'Perception',
+                    'Transform',
+                    'Routing',
+                    'Prediction',
+                    'Planning',
+                    'Camera',
+                    'Traffic Light',
+                    'Control'
+                ]
+            elif model_id == '2e9095fa-c9b9-4f3f-8d7d-65fa2bb03921':
+                modules = [
+                    'Localization',
+                    # 'Perception',
+                    'Transform',
+                    'Routing',
+                    'Prediction',
+                    'Planning',
+                    # 'Camera',
+                    # 'Traffic Light',
+                    'Control'
+                ]
+            else:
+                raise Exception('unknown model_id: '+ model_id)
 
             start = lgsvl.Transform(position=ego.transform.position, rotation=ego.transform.rotation)
 
