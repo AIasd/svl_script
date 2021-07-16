@@ -4,7 +4,8 @@ import shutil
 from distutils.dir_util import copy_tree
 import numpy as np
 
-from customized_utils import make_hierarchical_dir, emptyobject, check_bug, classify_bug_type
+from customized_utils import make_hierarchical_dir, emptyobject
+
 
 import lgsvl
 from svl_script.object_params import Pedestrian, Vehicle, Static, Waypoint
@@ -132,7 +133,8 @@ def convert_x_to_customized_data(
 
     return customized_data
 
-
+# TBD: implement SVL specific unique bugs/objective related functions
+# currently borrowed from carla implementation
 def estimate_objectives(save_path, default_objectives=np.array([0., 20., 1., 7., 7., 0., 0., 0., 0., 0.]), verbose=True):
 
     events_path = os.path.join(save_path, "events.txt")
@@ -206,6 +208,275 @@ def estimate_objectives(save_path, default_objectives=np.array([0., 20., 1., 7.,
         object_type,
         route_completion,
     )
+
+
+def check_bug(objectives):
+    # speed needs to be larger than 0.1 to avoid false positive
+    return objectives[0] > 0.1 or objectives[-3] or objectives[-2] or objectives[-1]
+
+def get_if_bug_list(objectives_list):
+    if_bug_list = []
+    for objective in objectives_list:
+        if_bug_list.append(check_bug(objective))
+    return np.array(if_bug_list)
+
+
+def process_specific_bug(
+    bug_type_ind, bugs_type_list, bugs_inds_list, bugs, mask, xl, xu, p, c, th
+):
+    if len(bugs) == 0:
+        return [], [], 0
+    verbose = True
+    chosen_bugs = np.array(bugs_type_list) == bug_type_ind
+
+    specific_bugs = np.array(bugs)[chosen_bugs]
+    specific_bugs_inds_list = np.array(bugs_inds_list)[chosen_bugs]
+
+    # unique_specific_bugs, specific_distinct_inds = get_distinct_data_points(
+    #     specific_bugs, mask, xl, xu, p, c, th
+    # )
+
+    specific_distinct_inds = is_distinct_vectorized(specific_bugs, [], mask, xl, xu, p, c, th, verbose=verbose)
+    unique_specific_bugs = specific_bugs[specific_distinct_inds]
+
+    unique_specific_bugs_inds_list = specific_bugs_inds_list[specific_distinct_inds]
+
+    return (
+        list(unique_specific_bugs),
+        list(unique_specific_bugs_inds_list),
+        len(unique_specific_bugs),
+    )
+
+def classify_bug_type(objectives, object_type=''):
+    bug_str = ''
+    bug_type = 5
+    if objectives[0] > 0.1:
+        collision_types = {'pedestrian_collision':pedestrian_types, 'car_collision':car_types, 'motercycle_collision':motorcycle_types, 'cyclist_collision':cyclist_types, 'static_collision':static_types}
+        for k,v in collision_types.items():
+            if object_type in v:
+                bug_str = k
+        if not bug_str:
+            bug_str = 'unknown_collision'+'_'+object_type
+        bug_type = 1
+    elif objectives[-3]:
+        bug_str = 'offroad'
+        bug_type = 2
+    elif objectives[-2]:
+        bug_str = 'wronglane'
+        bug_type = 3
+    if objectives[-1]:
+        bug_str += 'run_red_light'
+        if bug_type > 4:
+            bug_type = 4
+    return bug_type, bug_str
+
+def get_unique_bugs(
+    X, objectives_list, mask, xl, xu, unique_coeff, objective_weights, return_mode='unique_inds_and_interested_and_bugcounts', consider_interested_bugs=1, bugs_type_list=[], bugs=[], bugs_inds_list=[]
+):
+    p, c, th = unique_coeff
+    # hack:
+    if len(bugs) == 0:
+        for i, (x, objectives) in enumerate(zip(X, objectives_list)):
+            if check_bug(objectives):
+                bug_type, _ = classify_bug_type(objectives)
+                bugs_type_list.append(bug_type)
+                bugs.append(x)
+                bugs_inds_list.append(i)
+
+    (
+        unique_collision_bugs,
+        unique_collision_bugs_inds_list,
+        unique_collision_num,
+    ) = process_specific_bug(
+        1, bugs_type_list, bugs_inds_list, bugs, mask, xl, xu, p, c, th
+    )
+    (
+        unique_offroad_bugs,
+        unique_offroad_bugs_inds_list,
+        unique_offroad_num,
+    ) = process_specific_bug(
+        2, bugs_type_list, bugs_inds_list, bugs, mask, xl, xu, p, c, th
+    )
+    (
+        unique_wronglane_bugs,
+        unique_wronglane_bugs_inds_list,
+        unique_wronglane_num,
+    ) = process_specific_bug(
+        3, bugs_type_list, bugs_inds_list, bugs, mask, xl, xu, p, c, th
+    )
+    (
+        unique_redlight_bugs,
+        unique_redlight_bugs_inds_list,
+        unique_redlight_num,
+    ) = process_specific_bug(
+        4, bugs_type_list, bugs_inds_list, bugs, mask, xl, xu, p, c, th
+    )
+
+    unique_bugs = unique_collision_bugs + unique_offroad_bugs + unique_wronglane_bugs + unique_redlight_bugs
+    unique_bugs_num = len(unique_bugs)
+    unique_bugs_inds_list = unique_collision_bugs_inds_list + unique_offroad_bugs_inds_list + unique_wronglane_bugs_inds_list + unique_redlight_bugs_inds_list
+
+    if consider_interested_bugs:
+        collision_activated = np.sum(objective_weights[:3] != 0) > 0
+        offroad_activated = (np.abs(objective_weights[3]) > 0) | (
+            np.abs(objective_weights[5]) > 0
+        )
+        wronglane_activated = (np.abs(objective_weights[4]) > 0) | (
+            np.abs(objective_weights[5]) > 0
+        )
+        red_light_activated = np.abs(objective_weights[-1]) > 0
+
+        interested_unique_bugs = []
+        if collision_activated:
+            interested_unique_bugs += unique_collision_bugs
+        if offroad_activated:
+            interested_unique_bugs += unique_offroad_bugs
+        if wronglane_activated:
+            interested_unique_bugs += unique_wronglane_bugs
+        if red_light_activated:
+            interested_unique_bugs += unique_redlight_bugs
+    else:
+        interested_unique_bugs = unique_bugs
+
+    num_of_collisions = np.sum(np.array(bugs_type_list)==1)
+    num_of_offroad = np.sum(np.array(bugs_type_list)==2)
+    num_of_wronglane = np.sum(np.array(bugs_type_list)==3)
+    num_of_redlight = np.sum(np.array(bugs_type_list)==4)
+
+    if return_mode == 'unique_inds_and_interested_and_bugcounts':
+        return unique_bugs, unique_bugs_inds_list, interested_unique_bugs, [num_of_collisions, num_of_offroad, num_of_wronglane, num_of_redlight,
+        unique_collision_num, unique_offroad_num, unique_wronglane_num, unique_redlight_num]
+    elif return_mode == 'return_bug_info':
+        return unique_bugs, (bugs, bugs_type_list, bugs_inds_list, interested_unique_bugs)
+    elif return_mode == 'return_indices':
+        return unique_bugs, unique_bugs_inds_list
+    else:
+        return unique_bugs
+
+
+def choose_weight_inds(objective_weights):
+    collision_activated = np.sum(objective_weights[:3] != 0) > 0
+    offroad_activated = (np.abs(objective_weights[3]) > 0) | (
+        np.abs(objective_weights[5]) > 0
+    )
+    wronglane_activated = (np.abs(objective_weights[4]) > 0) | (
+        np.abs(objective_weights[5]) > 0
+    )
+    red_light_activated = np.abs(objective_weights[-1]) > 0
+
+    if collision_activated:
+        weight_inds = np.arange(0,3)
+    elif offroad_activated or wronglane_activated:
+        weight_inds = np.arange(3,6)
+    elif red_light_activated:
+        weight_inds = np.arange(9,10)
+    else:
+        raise
+    return weight_inds
+
+def determine_y_upon_weights(objective_list, objective_weights):
+    collision_activated = np.sum(objective_weights[:3] != 0) > 0
+    offroad_activated = (np.abs(objective_weights[3]) > 0) | (
+        np.abs(objective_weights[5]) > 0
+    )
+    wronglane_activated = (np.abs(objective_weights[4]) > 0) | (
+        np.abs(objective_weights[5]) > 0
+    )
+    red_light_activated = np.abs(objective_weights[-1]) > 0
+
+    y = np.zeros(len(objective_list))
+    for i, obj in enumerate(objective_list):
+        cond = 0
+        if collision_activated:
+            cond |= obj[0] > 0.1
+        if offroad_activated:
+            cond |= obj[-3] == 1
+        if wronglane_activated:
+            cond |= obj[-2] == 1
+        if red_light_activated:
+            cond |= obj[-1] == 1
+        y[i] = cond
+
+    return y
+
+def get_all_y(objective_list, objective_weights):
+    # is_collision, is_offroad, is_wrong_lane, is_run_red_light
+    collision_activated = np.sum(objective_weights[:3] != 0) > 0
+    offroad_activated = (np.abs(objective_weights[3]) > 0) | (
+        np.abs(objective_weights[5]) > 0
+    )
+    wronglane_activated = (np.abs(objective_weights[4]) > 0) | (
+        np.abs(objective_weights[5]) > 0
+    )
+    red_light_activated = np.abs(objective_weights[-1]) > 0
+
+    y_list = np.zeros((4, len(objective_list)))
+
+    for i, obj in enumerate(objective_list):
+        if collision_activated:
+            y_list[0, i] = obj[0] > 0.1
+        if offroad_activated:
+            y_list[1, i] = obj[-3] == 1
+        if wronglane_activated:
+            y_list[2, i] = obj[-2] == 1
+        if red_light_activated:
+            y_list[3, i] = obj[-1] == 1
+
+    return y_list
+
+def determine_y_upon_weights(objective_list, objective_weights):
+    collision_activated = np.sum(objective_weights[:3] != 0) > 0
+    offroad_activated = (np.abs(objective_weights[3]) > 0) | (
+        np.abs(objective_weights[5]) > 0
+    )
+    wronglane_activated = (np.abs(objective_weights[4]) > 0) | (
+        np.abs(objective_weights[5]) > 0
+    )
+    red_light_activated = np.abs(objective_weights[-1]) > 0
+
+    y = np.zeros(len(objective_list))
+    for i, obj in enumerate(objective_list):
+        cond = 0
+        if collision_activated:
+            cond |= obj[0] > 0.1
+        if offroad_activated:
+            cond |= obj[-3] == 1
+        if wronglane_activated:
+            cond |= obj[-2] == 1
+        if red_light_activated:
+            cond |= obj[-1] == 1
+        y[i] = cond
+
+    return y
+
+def get_all_y(objective_list, objective_weights):
+    # is_collision, is_offroad, is_wrong_lane, is_run_red_light
+    collision_activated = np.sum(objective_weights[:3] != 0) > 0
+    offroad_activated = (np.abs(objective_weights[3]) > 0) | (
+        np.abs(objective_weights[5]) > 0
+    )
+    wronglane_activated = (np.abs(objective_weights[4]) > 0) | (
+        np.abs(objective_weights[5]) > 0
+    )
+    red_light_activated = np.abs(objective_weights[-1]) > 0
+
+    y_list = np.zeros((4, len(objective_list)))
+
+    for i, obj in enumerate(objective_list):
+        if collision_activated:
+            y_list[0, i] = obj[0] > 0.1
+        if offroad_activated:
+            y_list[1, i] = obj[-3] == 1
+        if wronglane_activated:
+            y_list[2, i] = obj[-2] == 1
+        if red_light_activated:
+            y_list[3, i] = obj[-1] == 1
+
+    return y_list
+
+#####################################################################
+
+
 
 
 def run_svl_simulation(x, fuzzing_content, fuzzing_arguments, sim_specific_arguments, dt_arguments, launch_server, counter, port):
