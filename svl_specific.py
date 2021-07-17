@@ -11,6 +11,7 @@ import lgsvl
 from svl_script.object_params import Pedestrian, Vehicle, Static, Waypoint
 from svl_script.simulation_utils import start_simulation
 from svl_script.scene_configs import customized_bounds_and_distributions, customized_routes
+from svl_script.object_types import pedestrian_types, car_types, large_car_types, static_types
 
 def convert_x_to_customized_data(
     x,
@@ -251,7 +252,8 @@ def classify_bug_type(objectives, object_type=''):
     bug_str = ''
     bug_type = 5
     if objectives[0] > 0.1:
-        collision_types = {'pedestrian_collision':pedestrian_types, 'car_collision':car_types, 'motercycle_collision':motorcycle_types, 'cyclist_collision':cyclist_types, 'static_collision':static_types}
+        collision_types = {'pedestrian_collision':pedestrian_types, 'car_collision':car_types,
+        'large_car_collision':large_car_types, 'static_collision':static_types}
         for k,v in collision_types.items():
             if object_type in v:
                 bug_str = k
