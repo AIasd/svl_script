@@ -163,7 +163,7 @@ def save_measurement(ego, measurements_path):
     rot = state.rotation
     speed = state.speed * 3.6
     with open(measurements_path, 'a') as f_out:
-        f_out.write(','.join([str(v) for v in [speed, pos.x, pos.z, rot.x, rot.y, rot.z]])+'\n')
+        f_out.write(','.join([str(v) for v in [speed, pos.x, pos.y, pos.z, rot.x, rot.y, rot.z]])+'\n')
 
 def start_simulation(customized_data, arguments, sim_specific_arguments, launch_server, episode_max_time):
 
