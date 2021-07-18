@@ -49,6 +49,7 @@ def initialize_simulator(map, sim_specific_arguments):
         sim_specific_arguments.sim = sim
     else:
         sim = sim_specific_arguments.sim
+    # hack: TBD: make map name consistent for Apollo and carla
 
     if sim.current_scene == map:
         sim.reset()
@@ -59,7 +60,7 @@ def initialize_simulator(map, sim_specific_arguments):
     return sim, BRIDGE_HOST, BRIDGE_PORT
 
 
-def initialize_dv_and_ego(sim, model_id, start, destination, BRIDGE_HOST, BRIDGE_PORT, events_path):
+def initialize_dv_and_ego(sim, map, model_id, start, destination, BRIDGE_HOST, BRIDGE_PORT, events_path):
 
     global accident_happen
     accident_happen = False
@@ -102,7 +103,7 @@ def initialize_dv_and_ego(sim, model_id, start, destination, BRIDGE_HOST, BRIDGE
 
             # Dreamview setup
             dv = lgsvl.dreamview.Connection(sim, ego, BRIDGE_HOST)
-            dv.set_hd_map('Borregas Ave')
+            dv.set_hd_map(map)
             dv.set_vehicle('Lincoln2017MKZ_LGSVL')
 
             if model_id == '9272dd1a-793a-45b2-bff4-3a160b506d75':
@@ -177,11 +178,19 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
 
     model_id = arguments.model_id
     map = arguments.route_info["town_name"]
-    start, destination = arguments.route_info["location_list"]
+
 
     sim, BRIDGE_HOST, BRIDGE_PORT = initialize_simulator(map, sim_specific_arguments)
 
+    if len(arguments.route_info["location_list"]) == 0:
+        spawns = sim.get_spawn()
+        start = spawns[0]
+        destination = spawns[0].destinations[0]
+    else:
+        start, destination = arguments.route_info["location_list"]
 
+        start = lgsvl.Transform(position=lgsvl.Vector(start[0], start[1], start[2]), rotation=lgsvl.Vector(start[3], start[4], start[5]))
+        destination = lgsvl.Transform(position=lgsvl.Vector(destination[0], destination[1], destination[2]), rotation=lgsvl.Vector(destination[3], destination[4], destination[5]))
 
 
     try:
@@ -192,10 +201,9 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
         traceback.print_exc()
 
 
-    start = lgsvl.Transform(position=lgsvl.Vector(start[0], start[1], start[2]), rotation=lgsvl.Vector(start[3], start[4], start[5]))
-    destination = lgsvl.Transform(position=lgsvl.Vector(destination[0], destination[1], destination[2]), rotation=lgsvl.Vector(destination[3], destination[4], destination[5]))
 
-    ego = initialize_dv_and_ego(sim, model_id, start, destination, BRIDGE_HOST, BRIDGE_PORT, events_path)
+
+    ego = initialize_dv_and_ego(sim, map, model_id, start, destination, BRIDGE_HOST, BRIDGE_PORT, events_path)
 
     middle_point = lgsvl.Transform(position=(destination.position + start.position) * 0.5, rotation=start.rotation)
 
@@ -256,15 +264,8 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
     controllables = sim.get_controllables()
     for i in range(len(controllables)):
         signal = controllables[i]
-        # print("Index", i)
-        # print("Type:", signal.type)
-        # print("Transform:", signal.transform)
-        # print("Current state:", signal.current_state)
-        # print("Valid actions:", signal.valid_actions)
-        # print("Default control policy:", signal.default_control_policy)
-        # print("Current control policy:", signal.control_policy)
+
         if signal.type == "signal":
-            # control_policy = "trigger=200;green=5;yellow=1.5;red=5;loop"
             control_policy = signal.control_policy
             signal.control(control_policy)
 
@@ -415,6 +416,6 @@ def gather_info(ego, other_agents, cur_values, deviations_path):
 
 if __name__ == '__main__':
     atexit.register(exit_handler)
-    map = "BorregasAve"
+    map = "Borregas Ave"
     config = [4, 4, 2, 3, 10, 50]
     run_svl_simulation(map, config)
