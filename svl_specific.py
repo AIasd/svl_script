@@ -4,7 +4,7 @@ import shutil
 from distutils.dir_util import copy_tree
 import numpy as np
 
-from customized_utils import make_hierarchical_dir, emptyobject
+from customized_utils import make_hierarchical_dir, emptyobject, is_distinct_vectorized
 
 
 import lgsvl
