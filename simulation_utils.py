@@ -153,8 +153,6 @@ def initialize_dv_and_ego(sim, map, model_id, start, destination, BRIDGE_HOST, B
 
 def save_camera(ego, main_camera_folder, counter, i):
     import os
-    print('os.getcwd()', os.getcwd())
-    print('main_camera_folder', main_camera_folder)
     for sensor in ego.get_sensors():
         if sensor.name == "Main Camera":
             rel_path = '/home/zhongzzy9/Documents/self-driving-cars/2020_CARLA_challenge/run_results_svl'+'/'+"main_camera_"+str(counter)+'_'+str(i)+".png"
