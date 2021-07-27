@@ -267,9 +267,9 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
     controllables = sim.get_controllables()
     for i in range(len(controllables)):
         signal = controllables[i]
-
         if signal.type == "signal":
-            control_policy = signal.control_policy
+            # control_policy = signal.control_policy
+            control_policy = "trigger=200;green=10;yellow=2;red=5;loop"
             signal.control(control_policy)
 
 
