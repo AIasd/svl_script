@@ -151,12 +151,17 @@ def initialize_dv_and_ego(sim, map, model_id, start, destination, BRIDGE_HOST, B
 
 
 
-def save_camera(ego, main_camera_folder, i):
+def save_camera(ego, main_camera_folder, counter, i):
+    import os
+    print('os.getcwd()', os.getcwd())
+    print('main_camera_folder', main_camera_folder)
     for sensor in ego.get_sensors():
         if sensor.name == "Main Camera":
-            rel_path = "../2020_CARLA_challenge/"+main_camera_folder+"/"+"main_camera_"+str(i)+".png"
-            sensor.save(rel_path, compression=9)
-
+            rel_path = '/home/zhongzzy9/Documents/self-driving-cars/2020_CARLA_challenge/run_results_svl'+'/'+"main_camera_"+str(counter)+'_'+str(i)+".png"
+            try:
+                sensor.save(rel_path, compression=9)
+            except:
+                print('exception happens when saving camera image')
 def save_measurement(ego, measurements_path):
     state = ego.state
     pos = state.position
@@ -178,7 +183,7 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
 
     model_id = arguments.model_id
     map = arguments.route_info["town_name"]
-
+    counter = arguments.counter
 
     sim, BRIDGE_HOST, BRIDGE_PORT = initialize_simulator(map, sim_specific_arguments)
 
@@ -296,9 +301,8 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
 
         for i in range(steps):
             sim.run(time_limit=step_time, time_scale=1)
-
             if i % arguments.record_every_n_step == 0:
-                save_camera(ego, main_camera_folder, i)
+                save_camera(ego, main_camera_folder, counter, i)
 
             save_measurement(ego, measurements_path)
             gather_info(ego, other_agents, cur_values, deviations_path)
