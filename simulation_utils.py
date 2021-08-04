@@ -203,7 +203,14 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
         import traceback
         traceback.print_exc()
 
-
+    # reset signals to their current policy (not sure why this is necessary)
+    controllables = sim.get_controllables()
+    for i in range(len(controllables)):
+        signal = controllables[i]
+        if signal.type == "signal":
+            control_policy = signal.control_policy
+            control_policy = "trigger=500;red=5;yellow=2;green=10;loop"
+            # signal.control(control_policy)
 
 
     ego = initialize_dv_and_ego(sim, map, model_id, start, destination, BRIDGE_HOST, BRIDGE_PORT, events_path)
@@ -268,9 +275,9 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
     for i in range(len(controllables)):
         signal = controllables[i]
         if signal.type == "signal":
-            # control_policy = signal.control_policy
-            control_policy = "trigger=200;green=10;yellow=2;red=5;loop"
-            signal.control(control_policy)
+            control_policy = signal.control_policy
+            control_policy = "trigger=500;red=5;yellow=2;green=10;loop"
+            # signal.control(control_policy)
 
 
 
@@ -289,7 +296,7 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
         p.terminate()
 
     else:
-        step_time = 0.25
+        step_time = 2
         step_rate = 1.0 / step_time
         steps = int(duration * step_rate)
 
