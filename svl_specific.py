@@ -273,7 +273,7 @@ def classify_bug_type(objectives, object_type=''):
     return bug_type, bug_str
 
 def get_unique_bugs(
-    X, objectives_list, mask, xl, xu, unique_coeff, objective_weights, return_mode='unique_inds_and_interested_and_bugcounts', consider_interested_bugs=1, bugs_type_list=[], bugs=[], bugs_inds_list=[]
+    X, objectives_list, mask, xl, xu, unique_coeff, objective_weights, return_mode='unique_inds_and_interested_and_bugcounts', consider_interested_bugs=1, bugs_type_list=[], bugs=[], bugs_inds_list=[], trajectory_vector_list=[]
 ):
     p, c, th = unique_coeff
     # hack:

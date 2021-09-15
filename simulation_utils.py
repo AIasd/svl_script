@@ -115,7 +115,7 @@ def initialize_dv_and_ego(sim, map, model_id, start, destination, BRIDGE_HOST, B
                     'Prediction',
                     'Planning',
                     'Camera',
-                    'Traffic Light',
+                    # 'Traffic Light',
                     'Control'
                 ]
             elif model_id == '2e9095fa-c9b9-4f3f-8d7d-65fa2bb03921':
@@ -296,7 +296,7 @@ def start_simulation(customized_data, arguments, sim_specific_arguments, launch_
         p.terminate()
 
     else:
-        step_time = 2
+        step_time = 30
         step_rate = 1.0 / step_time
         steps = int(duration * step_rate)
 
