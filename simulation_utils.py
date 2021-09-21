@@ -88,6 +88,8 @@ def initialize_dv_and_ego(sim, map, model_id, start, destination, BRIDGE_HOST, B
         data_row = ','.join([str(data) for data in data_row])
         with open(events_path, 'a') as f_out:
             f_out.write(data_row+'\n')
+        time.sleep(2)
+        sim.stop()
 
 
     times = 0
@@ -151,6 +153,8 @@ def initialize_dv_and_ego(sim, map, model_id, start, destination, BRIDGE_HOST, B
 
 
 
+#######################################################################
+# for step-wise simulation
 def save_camera(ego, main_camera_folder, counter, i):
     import os
     for sensor in ego.get_sensors():
@@ -160,6 +164,7 @@ def save_camera(ego, main_camera_folder, counter, i):
                 sensor.save(rel_path, compression=9)
             except:
                 print('exception happens when saving camera image')
+
 def save_measurement(ego, measurements_path):
     state = ego.state
     pos = state.position
@@ -168,207 +173,7 @@ def save_measurement(ego, measurements_path):
     with open(measurements_path, 'a') as f_out:
         f_out.write(','.join([str(v) for v in [speed, pos.x, pos.y, pos.z, rot.x, rot.y, rot.z]])+'\n')
 
-def start_simulation(customized_data, arguments, sim_specific_arguments, launch_server, episode_max_time):
-
-
-    events_path = os.path.join(arguments.deviations_folder, "events.txt")
-    deviations_path = os.path.join(arguments.deviations_folder, 'deviations.txt')
-    measurements_path = os.path.join(arguments.deviations_folder, 'measurements.txt')
-    main_camera_folder = os.path.join(arguments.deviations_folder, 'main_camera_data')
-
-    if not os.path.exists(main_camera_folder):
-        os.mkdir(main_camera_folder)
-
-    model_id = arguments.model_id
-    map = arguments.route_info["town_name"]
-    counter = arguments.counter
-
-    sim, BRIDGE_HOST, BRIDGE_PORT = initialize_simulator(map, sim_specific_arguments)
-
-    if len(arguments.route_info["location_list"]) == 0:
-        spawns = sim.get_spawn()
-        start = spawns[0]
-        destination = spawns[0].destinations[0]
-    else:
-        start, destination = arguments.route_info["location_list"]
-
-        start = lgsvl.Transform(position=lgsvl.Vector(start[0], start[1], start[2]), rotation=lgsvl.Vector(start[3], start[4], start[5]))
-        destination = lgsvl.Transform(position=lgsvl.Vector(destination[0], destination[1], destination[2]), rotation=lgsvl.Vector(destination[3], destination[4], destination[5]))
-
-
-    try:
-        sim.weather = lgsvl.WeatherState(rain=customized_data['rain'], fog=customized_data['fog'], wetness=customized_data['wetness'], cloudiness=customized_data['cloudiness'], damage=customized_data['damage'])
-        sim.set_time_of_day(customized_data['hour'], fixed=True)
-    except:
-        import traceback
-        traceback.print_exc()
-
-    # reset signals to their current policy (not sure why this is necessary)
-    controllables = sim.get_controllables()
-    for i in range(len(controllables)):
-        signal = controllables[i]
-        if signal.type == "signal":
-            control_policy = signal.control_policy
-            control_policy = "trigger=500;red=5;yellow=2;green=10;loop"
-            # signal.control(control_policy)
-
-
-    ego = initialize_dv_and_ego(sim, map, model_id, start, destination, BRIDGE_HOST, BRIDGE_PORT, events_path)
-
-    middle_point = lgsvl.Transform(position=(destination.position + start.position) * 0.5, rotation=start.rotation)
-
-
-    other_agents = []
-    for static in customized_data['static_list']:
-        state = lgsvl.ObjectState()
-        state.transform.position = lgsvl.Vector(static.x,0,static.y)
-        state.transform.rotation = lgsvl.Vector(0,0,0)
-        state.velocity = lgsvl.Vector(0,0,0)
-        state.angular_velocity = lgsvl.Vector(0,0,0)
-
-
-        static_object = sim.controllable_add(static_types[static.model], state)
-
-    for ped in customized_data['pedestrians_list']:
-        ped_position_offset = lgsvl.Vector(ped.x, 0, ped.y)
-        ped_rotation_offset = lgsvl.Vector(0, 0, 0)
-        ped_point = lgsvl.Transform(position=middle_point.position+ped_position_offset, rotation=middle_point.rotation+ped_rotation_offset)
-
-        forward = lgsvl.utils.transform_to_forward(ped_point)
-
-        wps = []
-        for wp in ped.waypoints:
-            loc = middle_point.position+lgsvl.Vector(wp.x, 0, wp.y)
-            wps.append(lgsvl.WalkWaypoint(loc, 0, wp.trigger_distance))
-
-        state = lgsvl.AgentState()
-        state.transform = ped_point
-        state.velocity = ped.speed * forward
-
-        p = sim.add_agent(pedestrian_types[ped.model], lgsvl.AgentType.PEDESTRIAN, state)
-        p.follow(wps, False)
-
-        other_agents.append(p)
-
-    for vehicle in customized_data['vehicles_list']:
-        vehicle_position_offset = lgsvl.Vector(vehicle.x, 0, vehicle.y)
-        vehicle_rotation_offset = lgsvl.Vector(0, 0, 0)
-        vehicle_point = lgsvl.Transform(position=middle_point.position+vehicle_position_offset, rotation=middle_point.rotation+vehicle_rotation_offset)
-
-        forward = lgsvl.utils.transform_to_forward(vehicle_point)
-
-        wps = []
-        for wp in vehicle.waypoints:
-            loc = middle_point.position + lgsvl.Vector(wp.x, 0, wp.y)
-            wps.append(lgsvl.DriveWaypoint(loc, vehicle.speed, lgsvl.Vector(0, 0, 0), 0, False, wp.trigger_distance))
-
-        state = lgsvl.AgentState()
-        state.transform = vehicle_point
-        p = sim.add_agent(vehicle_types[vehicle.model], lgsvl.AgentType.NPC, state)
-        p.follow(wps, False)
-
-        other_agents.append(p)
-
-
-    # reset signals to their current policy (not sure why this is necessary)
-    controllables = sim.get_controllables()
-    for i in range(len(controllables)):
-        signal = controllables[i]
-        if signal.type == "signal":
-            control_policy = signal.control_policy
-            control_policy = "trigger=500;red=5;yellow=2;green=10;loop"
-            # signal.control(control_policy)
-
-
-
-    # WIP: continuously run the simulation
-    duration = episode_max_time
-    continuous = False
-    if continuous == True:
-        # save_camera(ego, main_camera_folder, i)
-        # save_measurement(ego, measurements_path)
-        # gather_info(ego, other_agents, cur_values, deviations_path)
-        from multiprocessing import Process
-        p = Process(target=save_measurement, args=(ego, measurements_path, ))
-        p.daemon = True
-        p.start()
-        sim.run(time_limit=duration, time_scale=1)
-        p.terminate()
-
-    else:
-        step_time = 30
-        step_rate = 1.0 / step_time
-        steps = int(duration * step_rate)
-
-
-        cur_values = emptyobject(min_d=10000, d_angle_norm=1)
-
-
-        for i in range(steps):
-            sim.run(time_limit=step_time, time_scale=1)
-            if i % arguments.record_every_n_step == 0:
-                save_camera(ego, main_camera_folder, counter, i)
-
-            save_measurement(ego, measurements_path)
-            gather_info(ego, other_agents, cur_values, deviations_path)
-
-            d_to_dest = norm_2d(ego.transform.position, destination.position)
-            # print('d_to_dest', d_to_dest)
-            if d_to_dest < 5:
-                print('ego car reachs destination successfully')
-                break
-
-            if accident_happen:
-                break
-
-
-
-# def angle_from_center_view_fov(target, ego, fov=90):
-#     target_location = target.transform.position
-#     ego_location = ego.transform.position
-#     ego_orientation = ego.transform.rotation.y
-#
-#     # hack: adjust to the front central camera's location
-#     # this needs to be changed when the camera's location / fov change
-#     dx = 1.3 * np.cos(np.deg2rad(ego_orientation - 90))
-#
-#
-#     target_vector = np.array([target_location.x - ego_location.x + dx, target_location.z - ego_location.z])
-#     print('target_location.x, ego_location.x, dx, target_location.z, ego_location.z', target_location.x, ego_location.x, dx, target_location.z, ego_location.z)
-#     norm_target = np.linalg.norm(target_vector)
-#
-#     # modification: differ from current carla implementation
-#     if norm_target < 0.001:
-#         return 1
-#
-#     forward_vector = np.array(
-#         [
-#             math.cos(math.radians(ego_orientation)),
-#             math.sin(math.radians(ego_orientation)),
-#         ]
-#     )
-#
-#     try:
-#         d_angle = np.abs(
-#             math.degrees(math.acos(np.dot(forward_vector, target_vector) / norm_target))
-#         )
-#     except:
-#         print(
-#             "\n" * 3,
-#             "np.dot(forward_vector, target_vector)",
-#             np.dot(forward_vector, target_vector),
-#             norm_target,
-#             "\n" * 3,
-#         )
-#         d_angle = 0
-#     # d_angle_norm == 0 when target within fov
-#     d_angle_norm = np.clip((d_angle - fov / 2) / (180 - fov / 2), 0, 1)
-#
-#     return d_angle_norm
-
 def get_bbox(agent):
-
-    # print('agent.bounding_box', agent.bounding_box)
     x_min = agent.bounding_box.min.x
     x_max = agent.bounding_box.max.x
     z_min = agent.bounding_box.min.z
@@ -383,7 +188,6 @@ def get_bbox(agent):
     return bbox
 
 def gather_info(ego, other_agents, cur_values, deviations_path):
-    # print('gather_info', 'deviations_path', deviations_path)
     ego_bbox = get_bbox(ego)
     # TBD: only using the front two vertices
     # ego_front_bbox = ego_bbox[:2]
@@ -401,12 +205,9 @@ def gather_info(ego, other_agents, cur_values, deviations_path):
         other_bbox = get_bbox(other_agent)
         for other_b in other_bbox:
             for ego_b in ego_bbox:
-                # print('other_bbox, ego_bbox', other_bbox, ego_bbox)
                 d = norm_2d(other_b, ego_b)
                 min_d = np.min([min_d, d])
 
-    # print('min_d', min_d)
-    # print('d_angle_norm', d_angle_norm)
     if min_d < cur_values.min_d:
         cur_values.min_d = min_d
         with open(deviations_path, 'a') as f_out:
@@ -417,9 +218,247 @@ def gather_info(ego, other_agents, cur_values, deviations_path):
         with open(deviations_path, 'a') as f_out:
             f_out.write('d_angle_norm,'+str(cur_values.d_angle_norm)+'\n')
 
-
     # TBD: out-of-road violation related data
 
+#######################################################################
+# for continuous simulation
+def bind_socket(socket, port_num):
+    import subprocess
+    while True:
+        try:
+            socket.bind("tcp://*:"+str(port_num))
+            break
+        except:
+            subprocess.run("kill $(lsof -t -i:" + str(port_num) + ")", shell=True)
+
+def receive_zmq(q, path_list, record_every_n_step):
+    import zmq
+    print('receive zmq')
+
+    def get_d(x1, y1, z1, x2, y2, z2):
+        return np.sqrt((x1-x2)**2+(y1-y2)**2)
+
+
+
+    odometry_path, perception_obstacles_path, main_camera_folder, deviations_path = path_list
+
+
+    print('start binding sockets')
+    context = zmq.Context()
+    socket_odometry = context.socket(zmq.PAIR)
+    socket_perception_obstacles = context.socket(zmq.PAIR)
+    socket_front_camera = context.socket(zmq.PAIR)
+
+    bind_socket(socket_odometry, 5561)
+    bind_socket(socket_perception_obstacles, 5562)
+    bind_socket(socket_front_camera, 5563)
+    print('finish binding sockets')
+
+    min_ego_i_d = 100
+    with open(odometry_path, 'a') as f_out_odometry:
+        with open(perception_obstacles_path, 'a') as f_out_perception_obstacles:
+            with open(deviations_path, 'a') as f_out:
+                while True:
+                    try:
+                        cmd = q.get(timeout=0.0001)
+                        if cmd == 'end':
+                            socket_odometry.close()
+                            socket_perception_obstacles.close()
+                            socket_front_camera.close()
+                            context.term()
+                            print('free sockets and context')
+                            return
+                    except:
+                        pass
+
+                    try:
+                        data_str_odometry = socket_odometry.recv_string(flags=zmq.NOBLOCK)
+                        data_str_perception_obstacles = socket_perception_obstacles.recv_string(flags=zmq.NOBLOCK)
+
+                        f_out_odometry.write(data_str_odometry+'\n')
+                        f_out_perception_obstacles.write(data_str_perception_obstacles+'\n')
+
+                        odometry_tokens = data_str_odometry.split(':')[1].split(',')
+                        perception_obstacles_tokens = data_str_perception_obstacles.split(':')[1].split(',')
+                        # detected a non-ego object
+                        npc_num = int(perception_obstacles_tokens[2])
+                        if npc_num > 0:
+                            ego_x, ego_y, ego_z = [float(x) for x in odometry_tokens[2:]]
+                            for i in range(npc_num):
+                                i_x, i_y, i_z = [float(x) for x in perception_obstacles_tokens[3*(1+i):3*(2+i)]]
+                                ego_i_d = get_d(ego_x, ego_y, ego_z, i_x, i_y, i_z)
+                                if ego_i_d < min_ego_i_d:
+                                    min_ego_i_d = ego_i_d
+                                    f_out.write('min_d,'+str(min_ego_i_d)+'\n')
+                                    print('min_d', min_ego_i_d)
+
+
+                        data_str_front_camera = socket_front_camera.recv(flags=zmq.NOBLOCK)
+                        timestamp_sec, sequence_num, front_image = data_str_front_camera.split(b':data_delimiter:')
+
+                        # record image after warm-up stage
+                        if int(sequence_num) > 150 and int(sequence_num) % record_every_n_step == 0:
+                            with open(os.path.join(main_camera_folder, sequence_num.decode()+'_'+timestamp_sec.decode()+'.jpg'), 'wb') as f_out_front_camera:
+                                f_out_front_camera.write(front_image)
+
+                    except Exception:
+                        # import traceback
+                        # print(traceback.format_exc())
+                        continue
+
+#######################################################################
+
+
+
+def start_simulation(customized_data, arguments, sim_specific_arguments, launch_server, episode_max_time):
+
+    def initialize_sim():
+        sim, BRIDGE_HOST, BRIDGE_PORT = initialize_simulator(map, sim_specific_arguments)
+
+        if len(arguments.route_info["location_list"]) == 0:
+            spawns = sim.get_spawn()
+            start = spawns[0]
+            destination = spawns[0].destinations[0]
+        else:
+            start, destination = arguments.route_info["location_list"]
+
+            start = lgsvl.Transform(position=lgsvl.Vector(start[0], start[1], start[2]), rotation=lgsvl.Vector(start[3], start[4], start[5]))
+            destination = lgsvl.Transform(position=lgsvl.Vector(destination[0], destination[1], destination[2]), rotation=lgsvl.Vector(destination[3], destination[4], destination[5]))
+
+        try:
+            sim.weather = lgsvl.WeatherState(rain=customized_data['rain'], fog=customized_data['fog'], wetness=customized_data['wetness'], cloudiness=customized_data['cloudiness'], damage=customized_data['damage'])
+            sim.set_time_of_day(customized_data['hour'], fixed=True)
+        except:
+            import traceback
+            traceback.print_exc()
+
+        ego = initialize_dv_and_ego(sim, map, model_id, start, destination, BRIDGE_HOST, BRIDGE_PORT, events_path)
+
+        middle_point = lgsvl.Transform(position=(destination.position + start.position) * 0.5, rotation=start.rotation)
+
+
+        other_agents = []
+        for static in customized_data['static_list']:
+            state = lgsvl.ObjectState()
+            state.transform.position = lgsvl.Vector(static.x,0,static.y)
+            state.transform.rotation = lgsvl.Vector(0,0,0)
+            state.velocity = lgsvl.Vector(0,0,0)
+            state.angular_velocity = lgsvl.Vector(0,0,0)
+
+
+            static_object = sim.controllable_add(static_types[static.model], state)
+
+        for ped in customized_data['pedestrians_list']:
+            ped_position_offset = lgsvl.Vector(ped.x, 0, ped.y)
+            ped_rotation_offset = lgsvl.Vector(0, 0, 0)
+            ped_point = lgsvl.Transform(position=middle_point.position+ped_position_offset, rotation=middle_point.rotation+ped_rotation_offset)
+
+            forward = lgsvl.utils.transform_to_forward(ped_point)
+
+            wps = []
+            for wp in ped.waypoints:
+                loc = middle_point.position+lgsvl.Vector(wp.x, 0, wp.y)
+                wps.append(lgsvl.WalkWaypoint(loc, 0, wp.trigger_distance))
+
+            state = lgsvl.AgentState()
+            state.transform = ped_point
+            state.velocity = ped.speed * forward
+
+            p = sim.add_agent(pedestrian_types[ped.model], lgsvl.AgentType.PEDESTRIAN, state)
+            p.follow(wps, False)
+            other_agents.append(p)
+
+        for vehicle in customized_data['vehicles_list']:
+            vehicle_position_offset = lgsvl.Vector(vehicle.x, 0, vehicle.y)
+            vehicle_rotation_offset = lgsvl.Vector(0, 0, 0)
+            vehicle_point = lgsvl.Transform(position=middle_point.position+vehicle_position_offset, rotation=middle_point.rotation+vehicle_rotation_offset)
+
+            forward = lgsvl.utils.transform_to_forward(vehicle_point)
+
+            wps = []
+            for wp in vehicle.waypoints:
+                loc = middle_point.position + lgsvl.Vector(wp.x, 0, wp.y)
+                wps.append(lgsvl.DriveWaypoint(loc, vehicle.speed, lgsvl.Vector(0, 0, 0), 0, False, wp.trigger_distance))
+
+            state = lgsvl.AgentState()
+            state.transform = vehicle_point
+            p = sim.add_agent(vehicle_types[vehicle.model], lgsvl.AgentType.NPC, state)
+            p.follow(wps, False)
+            other_agents.append(p)
+
+        controllables = sim.get_controllables()
+        for i in range(len(controllables)):
+            signal = controllables[i]
+            if signal.type == "signal":
+                control_policy = signal.control_policy
+                control_policy = "trigger=500;green=10;yellow=2;red=5;loop"
+                signal.control(control_policy)
+
+        return sim
+
+    def run_sim_with_initialization(q, duration, time_scale):
+        sim = initialize_sim()
+        print('start run sim')
+        sim.run(time_limit=duration, time_scale=time_scale)
+        q.put('end')
+        return
+
+
+    events_path = os.path.join(arguments.deviations_folder, "events.txt")
+    deviations_path = os.path.join(arguments.deviations_folder, 'deviations.txt')
+    main_camera_folder = os.path.join(arguments.deviations_folder, 'main_camera_data')
+
+    if not os.path.exists(main_camera_folder):
+        os.mkdir(main_camera_folder)
+
+    model_id = arguments.model_id
+    map = arguments.route_info["town_name"]
+    counter = arguments.counter
+
+
+    duration = episode_max_time
+    time_scale = 1
+    continuous = True
+    if continuous == True:
+        odometry_path = os.path.join(arguments.deviations_folder, 'odometry.txt')
+        perception_obstacles_path = os.path.join(arguments.deviations_folder, 'perception_obstacles.txt')
+        path_list = [odometry_path, perception_obstacles_path, main_camera_folder, deviations_path]
+
+        from multiprocessing import Process, Queue
+        q = Queue()
+        p = Process(target=run_sim_with_initialization, args=(q, duration, time_scale))
+        p.daemon = True
+        p.start()
+        receive_zmq(q, path_list, arguments.record_every_n_step)
+        p.terminate()
+
+
+    else:
+        measurements_path = os.path.join(arguments.deviations_folder, 'measurements.txt')
+
+        sim = initialize_sim()
+        step_time = 30
+        step_rate = 1.0 / step_time
+        steps = int(duration * step_rate)
+
+        cur_values = emptyobject(min_d=10000, d_angle_norm=1)
+
+        for i in range(steps):
+            sim.run(time_limit=step_time, time_scale=1)
+            if i % arguments.record_every_n_step == 0:
+                save_camera(ego, main_camera_folder, counter, i)
+
+            save_measurement(ego, measurements_path)
+            gather_info(ego, other_agents, cur_values, deviations_path)
+
+            d_to_dest = norm_2d(ego.transform.position, destination.position)
+            # print('d_to_dest', d_to_dest)
+            if d_to_dest < 5:
+                print('ego car reachs destination successfully')
+                break
+
+            if accident_happen:
+                break
 
 
 

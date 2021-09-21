@@ -23,7 +23,7 @@ keywords_dict = {
 
 
 general_fields = [
-    ("num_of_static", "int", 1, 1),
+    ("num_of_static", "int", 0, 0),
     ("num_of_pedestrians", "int", 1, 1),
     ("num_of_vehicles", "int", 1, 1),
 ]
@@ -62,14 +62,14 @@ pedestrian_general_fields = [
     ("num_of_pedestrian_types", "int", 0, len(pedestrian_types)-1),
     ("pedestrian_x", "real", -20, 20),
     ("pedestrian_y", "real", -20, 20),
-    ("pedestrian_speed", "real", 1, 8),
+    ("pedestrian_speed", "real", 1, 5),
 ]
 
 vehicle_general_fields = [
     ("num_of_vehicle_types", "int", 0, len(vehicle_types)-1),
     ("vehicle_x", "real", -20, 20),
     ("vehicle_y", "real", -20, 20),
-    ("vehicle_speed", "real", 1, 20),
+    ("vehicle_speed", "real", 1, 10),
 ]
 
 

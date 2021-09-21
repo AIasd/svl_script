@@ -16,14 +16,12 @@ def kill_mainboard():
         if proc.name() == PROC_NAME:
             proc.kill()
 
-
+def on_waypoint(agent, index):
+    print("Waypoint {} reached".format(index))
 
 def run_svl_simulation():
     log = logging.getLogger(__name__)
     atexit.register(kill_mainboard)
-
-
-
 
 
     SIMULATOR_HOST = os.environ.get("SIMULATOR_HOST", "127.0.0.1")
@@ -41,12 +39,7 @@ def run_svl_simulation():
 
     state = lgsvl.AgentState()
     state.transform = spawns[0]
-    # 5.0: 47b529db-0593-4908-b3e7-4b24a32a0f70
-    # 6.0: c354b519-ccf0-4c1c-b3cc-645ed5751bb5
-    # 6.0(modular testing): 2e9095fa-c9b9-4f3f-8d7d-65fa2bb03921
-    # 6.0(no telephoto camera and clock sensor): 4622f73a-250e-4633-9a3d-901ede6b9551
-    # 6.0(no clock sensor): f68151d1-604c-438e-a1a5-aa96d5581f4b
-    # 6.0(with signal sensor): 9272dd1a-793a-45b2-bff4-3a160b506d75
+
     ego = sim.add_agent("9272dd1a-793a-45b2-bff4-3a160b506d75", lgsvl.AgentType.EGO, state)
     ego.connect_bridge(BRIDGE_HOST, BRIDGE_PORT)
 
@@ -61,8 +54,8 @@ def run_svl_simulation():
         'Routing',
         'Prediction',
         'Planning',
-        # 'Camera',
-        # 'Traffic Light',
+        'Camera',
+        'Traffic Light',
         'Control'
     ]
     destination = spawns[0].destinations[0]
@@ -78,42 +71,47 @@ def run_svl_simulation():
     forward = lgsvl.utils.transform_to_forward(spawns[0])
     right = lgsvl.utils.transform_to_right(spawns[0])
 
+    print('spawns[0]', spawns[0])
     print('forward', forward)
     print('right', right)
 
 
+    import copy
 
-    radius = 4.5
-    count = 10
-    wp = []
-    for i in range(count):
-        x = radius * math.cos(i * 2 * math.pi / count)
-        z = radius * math.sin(i * 2 * math.pi / count)
-        # idle is how much time the pedestrian will wait once it reaches the waypoint
-        idle = 0 if i < count // 2 else 0
-        wp.append(
-            lgsvl.WalkWaypoint(spawns[0].position + x * right + (z + 12) * forward, idle)
-        )
     wp = [
-        lgsvl.WalkWaypoint(spawns[0].position + 20 * right + 60 * forward, 0),
-        lgsvl.WalkWaypoint(spawns[0].position + -20 * right + 60 * forward, 0) ]
+        lgsvl.WalkWaypoint(spawns[0].position + 6 * right + 50 * forward, 0),
+        lgsvl.WalkWaypoint(spawns[0].position + -15 * right + 50 * forward, 0) ]
     state = lgsvl.AgentState()
-    state.transform = spawns[0]
+    state.transform = copy.deepcopy(spawns[0])
     state.transform.position = wp[0].position
-    # state.velocity.x = -3*right.x
-    # state.velocity.z = -3*right.z
-
     p = sim.add_agent("Pamela", lgsvl.AgentType.PEDESTRIAN, state)
-
-
-    def on_waypoint(agent, index):
-        print("Waypoint {} reached".format(index))
-
-
-    p.on_waypoint_reached(on_waypoint)
-
-    # This sends the list of waypoints to the pedestrian. The bool controls whether or not the pedestrian will continue walking (default false)
+    # p.on_waypoint_reached(on_waypoint)
     p.follow(wp, False)
+
+
+    # import copy
+    # ped_start = copy.deepcopy(spawns[0])
+    #
+    # state = lgsvl.ObjectState()
+    # state.transform.position = ped_start.position + 1 * lgsvl.utils.transform_to_forward(ped_start)
+    #
+    # state.transform.rotation = lgsvl.Vector(0,0,0)
+    # state.velocity = lgsvl.Vector(0,0,0)
+    # state.angular_velocity = lgsvl.Vector(0,0,0)
+    # static_object = sim.controllable_add('TrafficCone', state)
+
+    wp2 = [
+        lgsvl.DriveWaypoint(spawns[0].position + 10 * right + 30 * forward, 1, lgsvl.Vector(0, 0, 0), 0, False, 50),
+        lgsvl.DriveWaypoint(spawns[0].position + -30 * right + 30 * forward, 1, lgsvl.Vector(0, 0, 0), 0, False, 50) ]
+    wp2[0].position.y = -1.5
+    wp2[1].position.y = -1.5
+    state = lgsvl.AgentState()
+    state.transform = copy.deepcopy(spawns[0])
+    state.transform.position = wp2[0].position
+    p = sim.add_agent('Sedan', lgsvl.AgentType.NPC, state)
+    p.follow(wp2, False)
+
+
 
 
     sim.run()
